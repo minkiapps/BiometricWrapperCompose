@@ -69,7 +69,7 @@ fun animateWitAnimatable(
     restartOnPlay: Boolean = true,
     clipSpec: LottieClipSpec? = null,
     iterations: Int = 1,
-    startProgress : Float = 0f
+    startProgress: Float = 0f
 ): LottieAnimatable {
     require(iterations > 0) { "Iterations must be a positive number ($iterations)." }
 
@@ -110,14 +110,15 @@ fun TestScreen() {
         rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.face_id_to_success))
 
     data class AnimState(
-        val type : Int = 1,
+        val type: Int = 1,
         val c: LottieCompositionResult,
         val clipSpec: LottieClipSpec,
         val iterations: Int,
-        val startProgress : Float
+        val startProgress: Float
     )
 
-    val default = AnimState(1,c1, LottieClipSpec.Progress(0f, 1f), LottieConstants.IterateForever, 0f)
+    val default =
+        AnimState(1, c1, LottieClipSpec.Progress(0f, 1f), LottieConstants.IterateForever, 0f)
     val success = AnimState(3, c2, LottieClipSpec.Progress(0f, 1f), 1, 0f)
 
     val state = remember {
@@ -126,7 +127,9 @@ fun TestScreen() {
 
 
     LaunchedEffect(
-        state.value
+        state.value.c.value,
+        state.value.clipSpec,
+        state.value.iterations
     ) {
         animatable.animate(
             state.value.c.value,
@@ -137,10 +140,10 @@ fun TestScreen() {
     }
 
 
-    if(state.value.type == 2 && animatable.isAtEnd){
+    if (state.value.type == 2 && animatable.isAtEnd) {
         state.value = success
     }
-    if(state.value.type == 3 && animatable.isAtEnd){
+    if (state.value.type == 3 && animatable.isAtEnd) {
         //TODO success finish
     }
 
@@ -161,7 +164,13 @@ fun TestScreen() {
                 Text(text = "Reset")
             }
             Button(onClick = {
-                state.value = AnimState(2, c1, LottieClipSpec.Progress(animatable.progress, 1f), 1, animatable.progress)
+                state.value = AnimState(
+                    2,
+                    c1,
+                    LottieClipSpec.Progress(animatable.progress, 1f),
+                    1,
+                    animatable.progress
+                )
             }) {
                 Text(text = "Success")
             }
