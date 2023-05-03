@@ -20,7 +20,22 @@ android {
         }
     }
 
+    signingConfigs {
+        debug {
+            def keyStoreFile = file("../debugkeystore.jks")
+            if (keyStoreFile.exists()) {
+                storeFile keyStoreFile
+                storePassword 'Test123'
+                keyAlias 'debug'
+                keyPassword 'Test123'
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -47,7 +62,6 @@ android {
 }
 
 dependencies {
-
     implementation 'androidx.core:core-ktx:1.10.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
     implementation 'androidx.activity:activity-compose:1.7.1'
