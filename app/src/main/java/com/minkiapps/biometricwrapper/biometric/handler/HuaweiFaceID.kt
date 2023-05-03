@@ -59,6 +59,7 @@ class HuaweiFaceIDHandler(context: Context) : BiometricHandler, HuaweiFaceIdUISt
         //https://developer.huawei.com/consumer/en/doc/development/Security-References/facemanager_x-0000001050418949
         const val FACE_ERROR_HW_UNAVAILABLE = 1
         const val FACE_ERROR_TIMEOUT = 3
+        const val FACE_ERROR_CANCELED = 5
     }
 
     private val faceManager = FaceManager(context)
@@ -99,6 +100,7 @@ class HuaweiFaceIDHandler(context: Context) : BiometricHandler, HuaweiFaceIdUISt
                 is ContinueState.Cancel -> {
                     uiDuringFaceIDFlow.update { FaceIDUIState.None }
                     continuation.resume(false)
+                    cancellationSignal.cancel()
                 }
                 is ContinueState.Retry -> {
                     uiDuringFaceIDFlow.update {
@@ -126,11 +128,11 @@ class HuaweiFaceIDHandler(context: Context) : BiometricHandler, HuaweiFaceIdUISt
             Timber.e("Face Authentication error errorCode=$errMsgId,errorMessage=$errString")
 
             when(errMsgId) {
-                FACE_ERROR_TIMEOUT -> {
-                    uiDuringFaceIDFlow.update { FaceIDUIState.AskToRetry(this) }
+                FACE_ERROR_CANCELED -> {
+                    //ignore canceled error
                 }
-                FACE_ERROR_HW_UNAVAILABLE -> {
-                    //ignore, since FACE_ERROR_TIMEOUT will follow
+                FACE_ERROR_TIMEOUT, FACE_ERROR_HW_UNAVAILABLE -> {
+                    uiDuringFaceIDFlow.update { FaceIDUIState.AskToRetry(this) }
                 }
                 else -> {
                     transitionFlow.update { TransitionState.ToFailed }
@@ -145,6 +147,7 @@ class HuaweiFaceIDHandler(context: Context) : BiometricHandler, HuaweiFaceIdUISt
         override fun onAuthSucceeded(result: BioAuthnResult) {
             Timber.d("Face Authentication succeeded!")
             transitionFlow.update { TransitionState.ToSuccess }
+            cancellationSignal.cancel()
         }
 
         override fun onAuthFailed() {

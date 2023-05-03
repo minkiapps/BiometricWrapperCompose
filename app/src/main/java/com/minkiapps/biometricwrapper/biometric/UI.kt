@@ -147,10 +147,11 @@ fun FaceIDRetryDialog(continuable: HuaweiFaceIdContinueable) {
 @Composable
 fun FaceIDRecognisingDialog(continuable: HuaweiFaceIdContinueable) {
     Dialog(
-        onDismissRequest = { },
+        onDismissRequest = {
+            continuable.continueWith(ContinueState.Cancel)
+        },
         properties = DialogProperties(
-            dismissOnBackPress = false,
-            dismissOnClickOutside = false
+            dismissOnBackPress = false
         )
     ) {
         Card(
@@ -162,7 +163,10 @@ fun FaceIDRecognisingDialog(continuable: HuaweiFaceIdContinueable) {
         ) {
             Column(
                 modifier = Modifier.padding(
-                    bottom = 8.dp
+                    bottom = 8.dp,
+                    start = 16.dp,
+                    top = 16.dp,
+                    end = 16.dp
                 ),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -171,33 +175,49 @@ fun FaceIDRecognisingDialog(continuable: HuaweiFaceIdContinueable) {
                     .collectAsStateWithLifecycle()
 
                 val imageSize = 100.dp
-                when (tState) {
-                    is TransitionState.Default -> {
-                        val composition by rememberLottieComposition(
-                            LottieCompositionSpec.RawRes(
-                                R.raw.face_id
-                            )
-                        )
-                        val progress by animateLottieCompositionAsState(
-                            composition = composition,
-                            iterations = LottieConstants.IterateForever
-                        )
 
+                when(tState) {
+                    TransitionState.Default -> {
+                        val composition by rememberLottieComposition(
+                            LottieCompositionSpec.RawRes(R.raw.face_id)
+                        )
+                        val animationState by animateLottieCompositionAsState(
+                            composition, iterations = LottieConstants.IterateForever
+                        )
                         LottieAnimation(
                             composition,
                             modifier = Modifier
                                 .width(imageSize)
                                 .height(imageSize),
-                            progress = { progress }
+                            progress = {
+                                animationState
+                            }
                         )
                     }
+                    TransitionState.ToSuccess -> {
+                        val composition by rememberLottieComposition(
+                            LottieCompositionSpec.RawRes(R.raw.face_id_to_success)
+                        )
+                        val animationState by animateLottieCompositionAsState(
+                            composition, iterations = 1
+                        )
+                        LottieAnimation(
+                            composition,
+                            modifier = Modifier
+                                .width(imageSize)
+                                .height(imageSize),
+                            progress = {
+                                animationState
+                            }
+                        )
 
-                    is TransitionState.ToFailed -> {
-                        continuable.continueWith(ContinueState.FailedTransitionEnd)
+
+                        if(animationState == 1f) {
+                            continuable.continueWith(ContinueState.SuccessTransitionEnd)
+                        }
                     }
-
-                    is TransitionState.ToSuccess -> {
-                        continuable.continueWith(ContinueState.SuccessTransitionEnd)
+                    TransitionState.ToFailed -> {
+                        continuable.continueWith(ContinueState.FailedTransitionEnd)
                     }
                 }
 
@@ -219,10 +239,10 @@ fun PreviewHuaweiFaceIDUI() {
         HuaweiFaceIdBiometricHandler(object : HuaweiFaceIdUIStateable {
             override fun getShowUIDuringFaceIDFlow(): StateFlow<FaceIDUIState> {
                 return MutableStateFlow(
-                    FaceIDUIState.AskToRetry(
+                    FaceIDUIState.Recognising(
                         object : HuaweiFaceIdContinueable {
                             override fun getUITransitionFlow(): StateFlow<TransitionState> {
-                                return MutableStateFlow(TransitionState.Default)
+                                return MutableStateFlow(TransitionState.ToSuccess)
                             }
 
                             override fun continueWith(state: ContinueState) {
