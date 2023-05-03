@@ -30,7 +30,6 @@ interface HuaweiFaceIdUIStateable {
     sealed class TransitionState {
         object Default : TransitionState()
         object ToSuccess : TransitionState()
-        object ToFailed : TransitionState()
     }
 
     fun getShowUIDuringFaceIDFlow() : StateFlow<FaceIDUIState>
@@ -135,7 +134,7 @@ class HuaweiFaceIDHandler(context: Context) : BiometricHandler, HuaweiFaceIdUISt
                     uiDuringFaceIDFlow.update { FaceIDUIState.AskToRetry(this) }
                 }
                 else -> {
-                    transitionFlow.update { TransitionState.ToFailed }
+                    continueWith(ContinueState.Cancel)
                 }
             }
         }
@@ -152,7 +151,7 @@ class HuaweiFaceIDHandler(context: Context) : BiometricHandler, HuaweiFaceIdUISt
 
         override fun onAuthFailed() {
             Timber.e("Face Authentication failed.")
-            transitionFlow.update { TransitionState.ToFailed }
+            continueWith(ContinueState.Cancel)
         }
     }
 }

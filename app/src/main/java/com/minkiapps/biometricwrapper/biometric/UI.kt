@@ -18,8 +18,11 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,6 +34,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieClipSpec
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
@@ -176,48 +180,49 @@ fun FaceIDRecognisingDialog(continuable: HuaweiFaceIdContinueable) {
 
                 val imageSize = 100.dp
 
-                when(tState) {
-                    TransitionState.Default -> {
-                        val composition by rememberLottieComposition(
-                            LottieCompositionSpec.RawRes(R.raw.face_id)
-                        )
-                        val animationState by animateLottieCompositionAsState(
-                            composition, iterations = LottieConstants.IterateForever
-                        )
-                        LottieAnimation(
-                            composition,
-                            modifier = Modifier
-                                .width(imageSize)
-                                .height(imageSize),
-                            progress = {
-                                animationState
-                            }
-                        )
+                val composition by rememberLottieComposition(
+                    LottieCompositionSpec.RawRes(R.raw.face_id_to_success)
+                )
+
+                val endFrameForInfiniteAnimation = 60
+                var clipSpec by remember {
+                    mutableStateOf<LottieClipSpec>(LottieClipSpec.Frame(0, endFrameForInfiniteAnimation))
+                }
+                var iteration by remember {
+                    mutableStateOf(LottieConstants.IterateForever)
+                }
+                val animState = animateLottieCompositionAsState(
+                    composition = composition,
+                    clipSpec = clipSpec,
+                    iterations = iteration
+                )
+
+                LottieAnimation(
+                    composition,
+                    progress = {
+                        animState.progress
+                    },
+                    modifier = Modifier
+                        .width(imageSize)
+                        .height(imageSize)
+                )
+
+                if(tState is TransitionState.ToSuccess) {
+                    val frame = remember {
+                        composition?.getFrameForProgress(animState.progress)?.toInt()
                     }
-                    TransitionState.ToSuccess -> {
-                        val composition by rememberLottieComposition(
-                            LottieCompositionSpec.RawRes(R.raw.face_id_to_success)
-                        )
-                        val animationState by animateLottieCompositionAsState(
-                            composition, iterations = 1
-                        )
-                        LottieAnimation(
-                            composition,
-                            modifier = Modifier
-                                .width(imageSize)
-                                .height(imageSize),
-                            progress = {
-                                animationState
-                            }
-                        )
 
+                    clipSpec = LottieClipSpec.Frame(frame, null)
+                    iteration = 1
 
-                        if(animationState == 1f) {
-                            continuable.continueWith(ContinueState.SuccessTransitionEnd)
+                    val animationEnd by remember {
+                        derivedStateOf {
+                            animState.progress >= 1f
                         }
                     }
-                    TransitionState.ToFailed -> {
-                        continuable.continueWith(ContinueState.FailedTransitionEnd)
+
+                    if(animationEnd) {
+                        continuable.continueWith(ContinueState.SuccessTransitionEnd)
                     }
                 }
 
