@@ -5,32 +5,29 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.airbnb.lottie.Lottie
+import com.airbnb.lottie.LottieComposition
+import com.airbnb.lottie.compose.*
+import com.airbnb.lottie.utils.Utils
 import com.minkiapps.biometricwrapper.biometric.BiometricHandler
 import com.minkiapps.biometricwrapper.biometric.BiometricUI
 import com.minkiapps.biometricwrapper.biometric.BiometricUIModel
@@ -51,7 +48,8 @@ class MainActivity : FragmentActivity() {
         val biometricHandler = getBiometricHandler(this)
 
         setContent {
-            val fireBiometric by vm.fireBiometricFlow.collectAsStateWithLifecycle()
+            TestScreen()
+            /*val fireBiometric by vm.fireBiometricFlow.collectAsStateWithLifecycle()
 
             BiometricwrapperTheme {
                 Screen(
@@ -59,17 +57,135 @@ class MainActivity : FragmentActivity() {
                     fireBiometric,
                     biometricHandler
                 ) { event -> vm.onViewEvent(event) }
-            }
+            }*/
         }
     }
 }
 
 @Composable
+fun animateWitAnimatable(
+    composition: LottieComposition?,
+    isPlaying: Boolean = true,
+    restartOnPlay: Boolean = true,
+    clipSpec: LottieClipSpec? = null,
+    iterations: Int = 1,
+    startProgress : Float = 0f
+): LottieAnimatable {
+    require(iterations > 0) { "Iterations must be a positive number ($iterations)." }
+
+    val animatable = rememberLottieAnimatable()
+    var wasPlaying by remember { mutableStateOf(isPlaying) }
+
+
+    LaunchedEffect(
+        composition,
+        isPlaying,
+        clipSpec,
+        iterations,
+    ) {
+        if (isPlaying && !wasPlaying && restartOnPlay) {
+            animatable.resetToBeginning()
+        }
+        wasPlaying = isPlaying
+        if (!isPlaying) return@LaunchedEffect
+
+        animatable.animate(
+            composition,
+            iterations = iterations,
+            clipSpec = clipSpec,
+            initialProgress = startProgress,
+            continueFromPreviousAnimate = false
+        )
+    }
+
+    return animatable
+}
+
+@Composable
+fun TestScreen() {
+
+    val animatable = rememberLottieAnimatable()
+    val c1 = rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.face_id))
+    val c2 =
+        rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.face_id_to_success))
+
+    data class AnimState(
+        val type : Int = 1,
+        val c: LottieCompositionResult,
+        val clipSpec: LottieClipSpec,
+        val iterations: Int,
+        val startProgress : Float
+    )
+
+    val default = AnimState(1,c1, LottieClipSpec.Progress(0f, 1f), LottieConstants.IterateForever, 0f)
+    val success = AnimState(3, c2, LottieClipSpec.Progress(0f, 1f), 1, 0f)
+
+    val state = remember {
+        mutableStateOf(default)
+    }
+
+
+    LaunchedEffect(
+        state.value
+    ) {
+        animatable.animate(
+            state.value.c.value,
+            iterations = state.value.iterations,
+            clipSpec = state.value.clipSpec,
+            initialProgress = state.value.startProgress
+        )
+    }
+
+
+    if(state.value.type == 2 && animatable.isAtEnd){
+        state.value = success
+    }
+    if(state.value.type == 3 && animatable.isAtEnd){
+        //TODO success finish
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceEvenly
+    ) {
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+
+            Button(onClick = {
+                state.value = default
+            }) {
+                Text(text = "Reset")
+            }
+            Button(onClick = {
+                state.value = AnimState(2, c1, LottieClipSpec.Progress(animatable.progress, 1f), 1, animatable.progress)
+            }) {
+                Text(text = "Success")
+            }
+
+            Button(onClick = { /*TODO*/ }) {
+                Text(text = "Fail")
+            }
+        }
+
+        LottieAnimation(
+            modifier = Modifier.size(100.dp),
+            composition = animatable.composition,
+            progress = { animatable.progress })
+
+    }
+}
+
+
+@Composable
 fun Screen(
     isHMSAvailable: Boolean,
-    fireBiometric : Boolean,
+    fireBiometric: Boolean,
     biometricHandler: BiometricHandler?,
-    onViewEvent : (ViewEvent) -> Unit
+    onViewEvent: (ViewEvent) -> Unit
 ) {
     val snackBarHostState = remember { SnackbarHostState() }
 
@@ -184,7 +300,7 @@ fun Screen(
                     }
                 }
 
-                if(fireBiometric) {
+                if (fireBiometric) {
                     Timber.d("FIRE BIOMETRIC!")
                     showBiometric()
                 }
@@ -209,14 +325,14 @@ fun DefaultPreview() {
     BiometricwrapperTheme {
         Screen(isHMSAvailable = true,
             true, object : BiometricHandler {
-            override fun canBeUsed(): Boolean {
-                return true
-            }
+                override fun canBeUsed(): Boolean {
+                    return true
+                }
 
-            override suspend fun showBiometricPrompt(uiModel: BiometricUIModel): Boolean {
-                return true
-            }
-        }) { }
+                override suspend fun showBiometricPrompt(uiModel: BiometricUIModel): Boolean {
+                    return true
+                }
+            }) { }
     }
 }
 
