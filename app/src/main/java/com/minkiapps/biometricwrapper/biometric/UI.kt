@@ -96,8 +96,19 @@ fun FaceIDRetryDialog(continuable: HuaweiFaceIdContinueable) {
             colors = CardDefaults.cardColors(containerColor = Black_olive)
         ) {
             Column(
+                modifier = Modifier.padding(top = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                val composition by rememberLottieComposition(
+                    LottieCompositionSpec.RawRes(R.raw.face_id_failed)
+                )
+                val imageSize = 100.dp
+                LottieAnimation(composition,
+                    modifier = Modifier
+                        .width(imageSize)
+                        .height(imageSize)
+                )
+
                 Text(text = "Face Not Recognised",
                     color = Color.White,
                     textAlign = TextAlign.Center,
