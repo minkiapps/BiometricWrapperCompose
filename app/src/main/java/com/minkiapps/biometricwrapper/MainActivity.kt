@@ -5,11 +5,13 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -22,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -31,6 +34,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieClipSpec
+import com.airbnb.lottie.compose.LottieCompositionResult
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.rememberLottieAnimatable
+import com.airbnb.lottie.compose.rememberLottieComposition
 import com.minkiapps.biometricwrapper.biometric.BiometricHandler
 import com.minkiapps.biometricwrapper.biometric.BiometricUI
 import com.minkiapps.biometricwrapper.biometric.BiometricUIModel
@@ -199,6 +209,67 @@ fun Screen(
     }
 }
 
+@Composable
+fun TestScreen() {
+
+    val animatable = rememberLottieAnimatable()
+    val recognising = rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.face_id_recognising))
+    val success = rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.face_id_success))
+
+    data class AnimState(
+        val c: LottieCompositionResult,
+        val clipSpec: LottieClipSpec? = null,
+        val iterations: Int = 1,
+    )
+
+    val default = AnimState(recognising, iterations = LottieConstants.IterateForever)
+    val state = remember {
+        mutableStateOf(default)
+    }
+
+    LaunchedEffect(
+        state.value.c.value
+    ) {
+        animatable.animate(
+            state.value.c.value,
+            iterations = state.value.iterations,
+            clipSpec = state.value.clipSpec
+        )
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceEvenly
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Button(onClick = {
+                state.value = default
+            }) {
+                Text(text = "Reset")
+            }
+            Button(onClick = {
+                state.value = AnimState(success,
+                    LottieClipSpec.Frame(
+                        min = recognising.value?.getFrameForProgress(animatable.progress)?.toInt()
+                    ),
+                    1
+                )
+            }) {
+                Text(text = "Success")
+            }
+        }
+
+        LottieAnimation(
+            modifier = Modifier.size(100.dp),
+            composition = animatable.composition,
+            progress = { animatable.progress })
+    }
+}
+
 @Preview(
     showBackground = true,
     showSystemUi = true,
@@ -218,6 +289,12 @@ fun DefaultPreview() {
             }
         }) { }
     }
+}
+
+@Preview
+@Composable
+fun TestScreenPreview() {
+    TestScreen()
 }
 
 data class ShowSnackBarState(

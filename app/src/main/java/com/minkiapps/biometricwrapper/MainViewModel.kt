@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import java.util.Timer
 
 class MainViewModel : ViewModel() {
 
@@ -23,6 +25,7 @@ class MainViewModel : ViewModel() {
     fun onViewEvent(viewEvent: ViewEvent) {
         when(viewEvent) {
             is ViewEvent.OnBiometricResult -> {
+                Timber.d("Received Biometric Result: ${viewEvent.success}")
                 _fireBiometricFlow.update { false }
             }
             ViewEvent.OnLaunchBiometricButtonClicked -> {

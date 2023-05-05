@@ -18,6 +18,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,11 +34,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.airbnb.lottie.LottieComposition
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieClipSpec
+import com.airbnb.lottie.compose.LottieCompositionResult
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieAnimatable
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.minkiapps.biometricwrapper.R
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdContinueable
@@ -48,6 +52,7 @@ import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable.
 import com.minkiapps.biometricwrapper.ui.theme.Black_olive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import timber.log.Timber
 
 @Composable
 fun BiometricUI(biometricHandler: BiometricHandler?) {
@@ -133,7 +138,26 @@ fun FaceIDRetryDialog(continuable: HuaweiFaceIdContinueable) {
                         ) {
                             continuable.continueWith(ContinueState.Retry)
                         }
-                        .padding(8.dp)
+                        .padding(12.dp)
+                )
+                Spacer(modifier = Modifier
+                    .fillMaxWidth()
+                    .height(0.5.dp)
+                    .background(Color.LightGray)
+                )
+                Text(
+                    text = "Use Fingerprint",
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = rememberRipple(bounded = true)
+                        ) {
+                            continuable.continueWith(ContinueState.UseDefaultBiometric)
+                        }
+                        .padding(12.dp)
                 )
                 Spacer(modifier = Modifier
                     .fillMaxWidth()
@@ -152,7 +176,7 @@ fun FaceIDRetryDialog(continuable: HuaweiFaceIdContinueable) {
                         ) {
                             continuable.continueWith(ContinueState.Cancel)
                         }
-                        .padding(8.dp)
+                        .padding(12.dp)
                 )
             }
         }
@@ -166,7 +190,8 @@ fun FaceIDRecognisingDialog(continuable: HuaweiFaceIdContinueable) {
             continuable.continueWith(ContinueState.Cancel)
         },
         properties = DialogProperties(
-            dismissOnBackPress = false
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
         )
     ) {
         Card(
@@ -191,44 +216,67 @@ fun FaceIDRecognisingDialog(continuable: HuaweiFaceIdContinueable) {
 
                 val imageSize = 100.dp
 
-                val composition by rememberLottieComposition(
-                    LottieCompositionSpec.RawRes(R.raw.face_id_to_success)
+                val recognisingComposition = rememberLottieComposition(
+                    LottieCompositionSpec.RawRes(R.raw.face_id_recognising)
                 )
 
-                val endFrameForInfiniteAnimation = 60
-                var clipSpec by remember {
-                    mutableStateOf<LottieClipSpec>(LottieClipSpec.Frame(0, endFrameForInfiniteAnimation))
-                }
-                var iteration by remember {
-                    mutableStateOf(LottieConstants.IterateForever)
-                }
-                val animState = animateLottieCompositionAsState(
-                    composition = composition,
-                    clipSpec = clipSpec,
-                    iterations = iteration
+                val successComposition = rememberLottieComposition(
+                    LottieCompositionSpec.RawRes(R.raw.face_id_success)
                 )
+
+                val animState = remember {
+                    mutableStateOf(
+                        AnimState(recognisingComposition, iterations = LottieConstants.IterateForever)
+                    )
+                }
+
+                val animatable = rememberLottieAnimatable()
+                LaunchedEffect(animState.value.compositionResult.value) {
+                    Timber.d("LAUNCH ANIMATION!")
+                    animatable.animate(
+                        animState.value.compositionResult.value,
+                        iterations = animState.value.iterations,
+                        clipSpec = animState.value.clipSpec
+                    )
+                }
 
                 LottieAnimation(
-                    composition,
-                    progress = {
-                        animState.progress
-                    },
+                    composition = animatable.composition,
+                    progress = { animatable.progress },
                     modifier = Modifier
                         .width(imageSize)
                         .height(imageSize)
                 )
 
-                if(tState is TransitionState.ToSuccess) {
-                    val frame = remember {
-                        composition?.getFrameForProgress(animState.progress)?.toInt()
+                val stateTransition by remember {
+                    derivedStateOf {
+                        tState
                     }
+                }
 
-                    clipSpec = LottieClipSpec.Frame(frame, null)
-                    iteration = 1
+                LaunchedEffect(stateTransition) {
+                    if(tState is TransitionState.ToSuccess) {
+                        Timber.d("SUCCESS TRANSITION!")
+                        val currentFrame =
+                            recognisingComposition.value?.getFrameForProgress(animatable.progress)
+                                ?.toInt()
+                        Timber.d("CURRENT FRAME: $currentFrame")
+                        val clipSpec = LottieClipSpec.Frame(
+                            min = currentFrame
+                        )
 
+                        animState.value = AnimState(
+                            successComposition,
+                            clipSpec,
+                            1
+                        )
+                    }
+                }
+
+                if(tState == TransitionState.ToSuccess) {
                     val animationEnd by remember {
                         derivedStateOf {
-                            animState.progress >= 1f
+                            animatable.progress >= 1f
                         }
                     }
 
@@ -248,6 +296,11 @@ fun FaceIDRecognisingDialog(continuable: HuaweiFaceIdContinueable) {
     }
 }
 
+data class AnimState(val compositionResult: LottieCompositionResult,
+                     val clipSpec: LottieClipSpec? = null,
+                     val iterations: Int = 1,
+)
+
 @Preview
 @Composable
 fun PreviewHuaweiFaceIDUI() {
@@ -255,7 +308,7 @@ fun PreviewHuaweiFaceIDUI() {
         HuaweiFaceIdBiometricHandler(object : HuaweiFaceIdUIStateable {
             override fun getShowUIDuringFaceIDFlow(): StateFlow<FaceIDUIState> {
                 return MutableStateFlow(
-                    FaceIDUIState.Recognising(
+                    FaceIDUIState.AskToRetry(
                         object : HuaweiFaceIdContinueable {
                             override fun getUITransitionFlow(): StateFlow<TransitionState> {
                                 return MutableStateFlow(TransitionState.ToSuccess)
