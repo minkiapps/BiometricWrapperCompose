@@ -36,11 +36,11 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieClipSpec
-import com.airbnb.lottie.compose.LottieCompositionResult
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.rememberLottieAnimatable
 import com.airbnb.lottie.compose.rememberLottieComposition
+import com.minkiapps.biometricwrapper.biometric.AnimState
 import com.minkiapps.biometricwrapper.biometric.BiometricHandler
 import com.minkiapps.biometricwrapper.biometric.BiometricUI
 import com.minkiapps.biometricwrapper.biometric.BiometricUIModel
@@ -216,22 +216,16 @@ fun TestScreen() {
     val recognising = rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.face_id_recognising))
     val success = rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.face_id_success))
 
-    data class AnimState(
-        val c: LottieCompositionResult,
-        val clipSpec: LottieClipSpec? = null,
-        val iterations: Int = 1,
-    )
-
     val default = AnimState(recognising, iterations = LottieConstants.IterateForever)
     val state = remember {
         mutableStateOf(default)
     }
 
     LaunchedEffect(
-        state.value.c.value
+        state.value.compositionResult.value
     ) {
         animatable.animate(
-            state.value.c.value,
+            state.value.compositionResult.value,
             iterations = state.value.iterations,
             clipSpec = state.value.clipSpec
         )
@@ -252,10 +246,9 @@ fun TestScreen() {
                 Text(text = "Reset")
             }
             Button(onClick = {
+                val startFrame = recognising.value?.getFrameForProgress(animatable.progress)?.toInt()
                 state.value = AnimState(success,
-                    LottieClipSpec.Frame(
-                        min = recognising.value?.getFrameForProgress(animatable.progress)?.toInt()
-                    ),
+                    LottieClipSpec.Frame(min = startFrame),
                     1
                 )
             }) {

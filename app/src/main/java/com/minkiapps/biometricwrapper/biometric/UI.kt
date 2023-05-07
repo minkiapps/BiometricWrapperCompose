@@ -34,10 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.airbnb.lottie.LottieComposition
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieClipSpec
-import com.airbnb.lottie.compose.LottieCompositionResult
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
@@ -214,75 +212,10 @@ fun FaceIDRecognisingDialog(continuable: HuaweiFaceIdContinueable) {
                     .getUITransitionFlow()
                     .collectAsStateWithLifecycle()
 
-                val imageSize = 100.dp
+                Timber.d("NEW tState: ${tState.javaClass.simpleName}")
 
-                val recognisingComposition = rememberLottieComposition(
-                    LottieCompositionSpec.RawRes(R.raw.face_id_recognising)
-                )
-
-                val successComposition = rememberLottieComposition(
-                    LottieCompositionSpec.RawRes(R.raw.face_id_success)
-                )
-
-                val animState = remember {
-                    mutableStateOf(
-                        AnimState(recognisingComposition, iterations = LottieConstants.IterateForever)
-                    )
-                }
-
-                val animatable = rememberLottieAnimatable()
-                LaunchedEffect(animState.value.compositionResult.value) {
-                    Timber.d("LAUNCH ANIMATION!")
-                    animatable.animate(
-                        animState.value.compositionResult.value,
-                        iterations = animState.value.iterations,
-                        clipSpec = animState.value.clipSpec
-                    )
-                }
-
-                LottieAnimation(
-                    composition = animatable.composition,
-                    progress = { animatable.progress },
-                    modifier = Modifier
-                        .width(imageSize)
-                        .height(imageSize)
-                )
-
-                val stateTransition by remember {
-                    derivedStateOf {
-                        tState
-                    }
-                }
-
-                LaunchedEffect(stateTransition) {
-                    if(tState is TransitionState.ToSuccess) {
-                        Timber.d("SUCCESS TRANSITION!")
-                        val currentFrame =
-                            recognisingComposition.value?.getFrameForProgress(animatable.progress)
-                                ?.toInt()
-                        Timber.d("CURRENT FRAME: $currentFrame")
-                        val clipSpec = LottieClipSpec.Frame(
-                            min = currentFrame
-                        )
-
-                        animState.value = AnimState(
-                            successComposition,
-                            clipSpec,
-                            1
-                        )
-                    }
-                }
-
-                if(tState == TransitionState.ToSuccess) {
-                    val animationEnd by remember {
-                        derivedStateOf {
-                            animatable.progress >= 1f
-                        }
-                    }
-
-                    if(animationEnd) {
-                        continuable.continueWith(ContinueState.SuccessTransitionEnd)
-                    }
+                FaceIDAnimationWithChangingClipSpecImpl(tState) {
+                    continuable.continueWith(ContinueState.SuccessTransitionEnd)
                 }
 
                 Text(
@@ -296,10 +229,126 @@ fun FaceIDRecognisingDialog(continuable: HuaweiFaceIdContinueable) {
     }
 }
 
-data class AnimState(val compositionResult: LottieCompositionResult,
-                     val clipSpec: LottieClipSpec? = null,
-                     val iterations: Int = 1,
-)
+@Composable
+fun FaceIDAnimationWithChangingClipSpecImpl(tState : TransitionState, animationEnd : () -> Unit) {
+    Timber.d("Calling FaceIDAnimationWithChangingClipSpecImpl")
+    val imageSize = 100.dp
+
+    val composition by rememberLottieComposition(
+        LottieCompositionSpec.RawRes(R.raw.face_id_success)
+    )
+
+    val endFrameForInfiniteAnimation = 120
+    var clipSpec by remember {
+        mutableStateOf<LottieClipSpec>(LottieClipSpec.Frame(0, endFrameForInfiniteAnimation))
+    }
+    var iteration by remember {
+        mutableStateOf(LottieConstants.IterateForever)
+    }
+    val animState = animateLottieCompositionAsState(
+        composition = composition,
+        clipSpec = clipSpec,
+        iterations = iteration
+    )
+
+    LottieAnimation(
+        composition,
+        progress = { animState.progress },
+        modifier = Modifier
+            .width(imageSize)
+            .height(imageSize)
+    )
+
+    LaunchedEffect(tState) {
+        if(tState is TransitionState.ToSuccess) {
+            Timber.d("SUCCESS TRANSITION! Changing Clipspec")
+            val frame = composition?.getFrameForProgress(animState.progress)?.toInt()
+            clipSpec = LottieClipSpec.Frame(frame, null)
+            iteration = 1
+        }
+    }
+
+    if(tState == TransitionState.ToSuccess) {
+        val end by remember {
+            derivedStateOf {
+                animState.progress >= 1f
+            }
+        }
+
+        if(end) {
+            animationEnd()
+        }
+    }
+}
+
+@Composable
+fun FaceIDAnimationWithSwapAnimationImpl(tState : TransitionState, animationEnd : () -> Unit) {
+    Timber.d("Calling FaceIDAnimationWithSwapAnimationImpl")
+    val imageSize = 100.dp
+
+    val recComp = rememberLottieComposition(
+        LottieCompositionSpec.RawRes(R.raw.face_id_recognising)
+    )
+
+    val successComp = rememberLottieComposition(
+        LottieCompositionSpec.RawRes(R.raw.face_id_success)
+    )
+
+    val animState = remember {
+        mutableStateOf(
+            AnimState(recComp, iterations = LottieConstants.IterateForever)
+        )
+    }
+
+    val animatable = rememberLottieAnimatable()
+    LaunchedEffect(animState.value.compositionResult.value) {
+        Timber.d("LAUNCH ANIMATION due to compositionResult.value change.")
+        animatable.animate(
+            animState.value.compositionResult.value,
+            iterations = animState.value.iterations,
+            clipSpec = animState.value.clipSpec
+        )
+    }
+
+
+    LottieAnimation(
+        composition = animatable.composition,
+        progress = { animatable.progress },
+        modifier = Modifier
+            .width(imageSize)
+            .height(imageSize)
+    )
+
+    LaunchedEffect(tState) {
+        if(tState == TransitionState.ToSuccess) {
+            Timber.d("SUCCESS TRANSITION! Swap animation with intial frame.")
+            val currentFrame =
+                recComp.value?.getFrameForProgress(animatable.progress)?.toInt()
+            Timber.d("CURRENT FRAME: $currentFrame")
+            val clipSpec = LottieClipSpec.Frame(
+                min = currentFrame
+            )
+
+            animState.value = AnimState(
+                successComp,
+                clipSpec,
+                1
+            )
+        }
+    }
+
+    if(tState == TransitionState.ToSuccess) {
+        val end by remember {
+            derivedStateOf {
+                animatable.progress >= 1f
+            }
+        }
+
+        if(end) {
+            animationEnd()
+        }
+    }
+}
 
 @Preview
 @Composable

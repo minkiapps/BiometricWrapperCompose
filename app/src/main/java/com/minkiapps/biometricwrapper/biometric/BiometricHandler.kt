@@ -13,7 +13,7 @@ interface BiometricHandler {
 data class BiometricUIModel(val title : String,
                             val description : String)
 
-fun getBiometricHandler(activity: FragmentActivity) : com.minkiapps.biometricwrapper.biometric.BiometricHandler? {
+fun getBiometricHandler(activity: FragmentActivity) : BiometricHandler? {
     val defaultHandler = BiometricHandlerImpl(activity)
 
     if(activity.isHMSAvailable()) {

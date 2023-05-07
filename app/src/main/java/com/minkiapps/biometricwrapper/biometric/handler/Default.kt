@@ -4,7 +4,6 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.biometric.auth.AuthPromptCallback
 import androidx.biometric.auth.AuthPromptErrorException
-import androidx.biometric.auth.AuthPromptFailureException
 import androidx.biometric.auth.AuthPromptHost
 import androidx.biometric.auth.Class2BiometricAuthPrompt
 import androidx.fragment.app.FragmentActivity
@@ -41,10 +40,6 @@ class BiometricHandlerImpl(private val activity: FragmentActivity) :
             // Possible values for AuthPromptErrorException.errorCode are listed in the @IntDef,
             // androidx.biometric.BiometricPrompt.AuthenticationError.
             Timber.e("Biometric auth error, code: ${e.errorCode} message: ${e.errorMessage}")
-            false
-        } catch (e: AuthPromptFailureException) {
-            // Handle auth failure due biometric credentials being rejected.
-            Timber.e("Biometric auth rejected.")
             false
         }
     }
