@@ -20,7 +20,7 @@ class BiometricHandlerImpl(private val activity: FragmentActivity) :
 
     private val biometricManager = BiometricManager.from(activity)
 
-    override fun canBeUsed() : Boolean {
+    fun canBeUsed() : Boolean {
         return biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
     }
 

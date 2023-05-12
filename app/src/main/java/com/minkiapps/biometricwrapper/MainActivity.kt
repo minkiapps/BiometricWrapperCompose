@@ -45,7 +45,7 @@ import com.minkiapps.biometricwrapper.biometric.AnimState
 import com.minkiapps.biometricwrapper.biometric.BiometricHandler
 import com.minkiapps.biometricwrapper.biometric.BiometricUI
 import com.minkiapps.biometricwrapper.biometric.BiometricUIModel
-import com.minkiapps.biometricwrapper.biometric.getBiometricHandler
+import com.minkiapps.biometricwrapper.biometric.biometricHandlerLifeCycleAware
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdContinueable
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable.FaceIDUIState
@@ -68,7 +68,6 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
 
         val isHMSAvailable = isHMSAvailable()
-        val biometricHandler = getBiometricHandler(this)
 
         setContent {
             val fireBiometric by vm.fireBiometricFlow.collectAsStateWithLifecycle()
@@ -77,7 +76,7 @@ class MainActivity : FragmentActivity() {
                 Screen(
                     isHMSAvailable,
                     fireBiometric,
-                    biometricHandler
+                    biometricHandlerLifeCycleAware(this)
                 ) { event -> vm.onViewEvent(event) }
             }
         }
@@ -173,7 +172,7 @@ fun Screen(
                 }
             }
 
-            if(biometricHandler != null) {
+            if (biometricHandler != null) {
                 Text(text = biometricHandler.toString())
             }
 
@@ -311,10 +310,6 @@ fun DefaultPreview() {
                     return "Test Huawei FaceID Handler"
                 }
 
-                override fun canBeUsed(): Boolean {
-                    return true
-                }
-
                 override suspend fun showBiometricPrompt(uiModel: BiometricUIModel): Boolean {
                     toSuccessContinueable.tFlow.update { TransitionState.Default }
                     flow.update { FaceIDUIState.Recognising(toSuccessContinueable) }
@@ -329,8 +324,8 @@ fun DefaultPreview() {
                     return flow
                 }
             }) { e ->
-                fireBiometric = e == ViewEvent.OnLaunchBiometricButtonClicked
-            }
+            fireBiometric = e == ViewEvent.OnLaunchBiometricButtonClicked
+        }
     }
 }
 

@@ -2,6 +2,7 @@ package com.minkiapps.biometricwrapper.biometric.handler
 
 import android.os.CancellationSignal
 import android.os.Looper
+import androidx.annotation.MainThread
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -59,7 +60,8 @@ interface HuaweiFaceIdContinueable {
     }
 }
 
-class HuaweiFaceIDHandler(private val activity: FragmentActivity, private val defaultBiometricHandler: BiometricHandler?)
+class HuaweiFaceIDHandler(private val activity: FragmentActivity,
+                          private val defaultBiometricHandler: BiometricHandler?)
     : BiometricHandler, HuaweiFaceIdUIStateable {
 
     companion object {
@@ -81,10 +83,11 @@ class HuaweiFaceIDHandler(private val activity: FragmentActivity, private val de
 
     override fun getShowUIDuringFaceIDFlow(): StateFlow<FaceIDUIState> = uiDuringFaceIDFlow
 
-    override fun canBeUsed() : Boolean {
+    fun canBeUsed() : Boolean {
         return faceManager.canAuth() == FaceManager.FACE_SUCCESS
     }
 
+    @MainThread
     override suspend fun showBiometricPrompt(uiModel: BiometricUIModel): Boolean {
         val result : FaceIDHandlerResult = suspendCancellableCoroutine { cont ->
             val faceIDContinuation = FaceIDContinuation(cont, CancellationSignal(), activity.lifecycle)
@@ -111,8 +114,10 @@ class HuaweiFaceIDHandler(private val activity: FragmentActivity, private val de
 
         init {
             lifecycle.addObserver(this)
-            continuation.invokeOnCancellation {
+            continuation.invokeOnCancellation { //cleanup face recognition and UI state
+                uiDuringFaceIDFlow.update { FaceIDUIState.None }
                 cancellationSignal.cancel()
+                internalFaceIDState = null
             }
         }
         override fun continueWith(state: FaceIDState) {
@@ -197,16 +202,15 @@ class HuaweiFaceIDHandler(private val activity: FragmentActivity, private val de
 
         override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
             if(event == Lifecycle.Event.ON_PAUSE) {
+                source.lifecycle.removeObserver(this) //whole flow dies after onPause
                 when(internalFaceIDState) {
                     FaceIDState.Recognising -> {
-                        Timber.d("On Pause detected while face recognition, cancel whole flow.")
+                        Timber.d("On Pause detected while Recognising state, cancel whole flow.")
                         cancellationSignal.cancel()
-                        source.lifecycle.removeObserver(this)
                     }
                     FaceIDState.NotRecognised -> {
                         Timber.d("On Pause detected while NotRecognised state, cancel whole flow.")
                         continueWith(FaceIDState.Cancel)
-                        source.lifecycle.removeObserver(this)
                     }
                     else -> {
 

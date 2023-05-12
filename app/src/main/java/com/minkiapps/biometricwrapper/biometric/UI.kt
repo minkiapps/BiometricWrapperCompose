@@ -323,7 +323,6 @@ fun FaceIDAnimationWithSwapAnimationImpl(tState : TransitionState, animationEnd 
         )
     }
 
-
     LottieAnimation(
         composition = animatable.composition,
         progress = { animatable.progress },
