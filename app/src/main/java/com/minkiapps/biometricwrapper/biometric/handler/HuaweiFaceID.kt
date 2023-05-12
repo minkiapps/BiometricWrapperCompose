@@ -1,13 +1,17 @@
 package com.minkiapps.biometricwrapper.biometric.handler
 
-import android.content.Context
 import android.os.CancellationSignal
+import android.os.Looper
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import com.huawei.hms.support.api.fido.bioauthn.BioAuthnCallback
 import com.huawei.hms.support.api.fido.bioauthn.BioAuthnResult
 import com.huawei.hms.support.api.fido.bioauthn.FaceManager
 import com.minkiapps.biometricwrapper.biometric.BiometricHandler
 import com.minkiapps.biometricwrapper.biometric.BiometricUIModel
-import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdContinueable.ContinueState
+import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdContinueable.FaceIDState
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable.FaceIDUIState
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable.TransitionState
 import com.minkiapps.biometricwrapper.util.resumeIfPossible
@@ -24,7 +28,10 @@ interface HuaweiFaceIdUIStateable {
 
         class Recognising(val faceIDContinuation: HuaweiFaceIdContinueable) : FaceIDUIState()
 
-        class AskToRetry(val faceIDContinuation: HuaweiFaceIdContinueable) : FaceIDUIState()
+        class NotRecognised(
+            val faceIDContinuation: HuaweiFaceIdContinueable,
+            val isNonRecoverableError : Boolean,
+            val hasFingerprint : Boolean) : FaceIDUIState()
     }
 
     sealed class TransitionState {
@@ -39,20 +46,20 @@ interface HuaweiFaceIdContinueable {
 
     fun getUITransitionFlow() : StateFlow<TransitionState>
 
-    fun continueWith(state : ContinueState)
+    fun continueWith(state : FaceIDState)
 
-    sealed class ContinueState {
-        object Retry : ContinueState()
-
-        object UseDefaultBiometric : ContinueState()
-
-        object Cancel : ContinueState()
-
-        object SuccessTransitionEnd : ContinueState()
+    sealed class FaceIDState {
+        object Recognising : FaceIDState()
+        object Recognised : FaceIDState()
+        object SuccessTransitionEnd : FaceIDState()
+        object NotRecognised : FaceIDState()
+        object UseDefaultBiometric : FaceIDState()
+        object Cancel : FaceIDState()
+        object Failed : FaceIDState()
     }
 }
 
-class HuaweiFaceIDHandler(context: Context, private val defaultBiometricHandler: BiometricHandler?)
+class HuaweiFaceIDHandler(private val activity: FragmentActivity, private val defaultBiometricHandler: BiometricHandler?)
     : BiometricHandler, HuaweiFaceIdUIStateable {
 
     companion object {
@@ -68,7 +75,7 @@ class HuaweiFaceIDHandler(context: Context, private val defaultBiometricHandler:
         FALLBACK_TO_DEFAULT
     }
 
-    private val faceManager = FaceManager(context)
+    private val faceManager = FaceManager(activity)
 
     private val uiDuringFaceIDFlow = MutableStateFlow<FaceIDUIState>(FaceIDUIState.None)
 
@@ -80,17 +87,8 @@ class HuaweiFaceIDHandler(context: Context, private val defaultBiometricHandler:
 
     override suspend fun showBiometricPrompt(uiModel: BiometricUIModel): Boolean {
         val result : FaceIDHandlerResult = suspendCancellableCoroutine { cont ->
-            val cancellationSignal = CancellationSignal()
-            val callbackWithContinuation = FaceIDContinuation(cont, cancellationSignal)
-
-            uiDuringFaceIDFlow.update {
-                FaceIDUIState.Recognising(callbackWithContinuation)
-            }
-            faceManager.auth(null, cancellationSignal, 0, callbackWithContinuation, null)
-
-            cont.invokeOnCancellation {
-                cancellationSignal.cancel()
-            }
+            val faceIDContinuation = FaceIDContinuation(cont, CancellationSignal(), activity.lifecycle)
+            faceIDContinuation.continueWith(FaceIDState.Recognising)
         }
 
         return when(result) {
@@ -104,33 +102,61 @@ class HuaweiFaceIDHandler(context: Context, private val defaultBiometricHandler:
 
     inner class FaceIDContinuation(
         private val continuation: CancellableContinuation<FaceIDHandlerResult>,
-        private val cancellationSignal: CancellationSignal
-    ) : BioAuthnCallback(), HuaweiFaceIdContinueable {
+        private val cancellationSignal: CancellationSignal,
+        lifecycle: Lifecycle
+    ) : BioAuthnCallback(), HuaweiFaceIdContinueable, LifecycleEventObserver {
 
         private val transitionFlow = MutableStateFlow<TransitionState>(TransitionState.Default)
+        private var internalFaceIDState : FaceIDState? = null
 
-        override fun continueWith(state: ContinueState) {
+        init {
+            lifecycle.addObserver(this)
+            continuation.invokeOnCancellation {
+                cancellationSignal.cancel()
+            }
+        }
+        override fun continueWith(state: FaceIDState) {
+            Timber.d("Continue with state ${state.javaClass.simpleName} on Main Thread = ${Looper.getMainLooper().isCurrentThread}")
+            internalFaceIDState = state
             when(state) {
-                is ContinueState.Cancel -> {
+                FaceIDState.Cancel -> {
                     uiDuringFaceIDFlow.update { FaceIDUIState.None }
                     continuation.resumeIfPossible(FaceIDHandlerResult.NO_SUCCESS)
-                    cancellationSignal.cancel()
                 }
-                is ContinueState.Retry -> {
+
+                FaceIDState.Recognised -> {
+                    transitionFlow.update { TransitionState.ToSuccess }
+                }
+
+                FaceIDState.Recognising -> {
                     uiDuringFaceIDFlow.update {
                         FaceIDUIState.Recognising(this)
                     }
                     faceManager.auth(null, cancellationSignal, 0, this, null)
                 }
-                is ContinueState.SuccessTransitionEnd -> {
+
+                FaceIDState.SuccessTransitionEnd -> {
                     uiDuringFaceIDFlow.update { FaceIDUIState.None }
                     continuation.resumeIfPossible(FaceIDHandlerResult.SUCCESS)
                 }
 
-                ContinueState.UseDefaultBiometric -> {
+                FaceIDState.UseDefaultBiometric -> {
                     uiDuringFaceIDFlow.update { FaceIDUIState.None }
-                    cancellationSignal.cancel()
                     continuation.resumeIfPossible(FaceIDHandlerResult.FALLBACK_TO_DEFAULT)
+                }
+
+                is FaceIDState.NotRecognised -> {
+                    uiDuringFaceIDFlow.update {
+                        FaceIDUIState.NotRecognised(this, false,
+                            defaultBiometricHandler != null)
+                    }
+                }
+
+                FaceIDState.Failed -> {
+                    uiDuringFaceIDFlow.update {
+                        FaceIDUIState.NotRecognised(this, true,
+                            defaultBiometricHandler != null)
+                    }
                 }
             }
         }
@@ -144,13 +170,13 @@ class HuaweiFaceIDHandler(context: Context, private val defaultBiometricHandler:
 
             when(errMsgId) {
                 FACE_ERROR_CANCELED -> {
-                    //ignore canceled error
+                    continueWith(FaceIDState.Cancel)
                 }
                 FACE_ERROR_TIMEOUT, FACE_ERROR_HW_UNAVAILABLE -> {
-                    uiDuringFaceIDFlow.update { FaceIDUIState.AskToRetry(this) }
+                    continueWith(FaceIDState.NotRecognised)
                 }
                 else -> {
-                    continueWith(ContinueState.Cancel)
+                    continueWith(FaceIDState.Failed)
                 }
             }
         }
@@ -161,13 +187,36 @@ class HuaweiFaceIDHandler(context: Context, private val defaultBiometricHandler:
 
         override fun onAuthSucceeded(result: BioAuthnResult) {
             Timber.d("Face Authentication succeeded!")
-            transitionFlow.update { TransitionState.ToSuccess }
-            cancellationSignal.cancel()
+            continueWith(FaceIDState.Recognised)
         }
 
         override fun onAuthFailed() {
             Timber.e("Face Authentication failed.")
-            continueWith(ContinueState.Cancel)
+            continueWith(FaceIDState.Failed)
         }
+
+        override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
+            if(event == Lifecycle.Event.ON_PAUSE) {
+                when(internalFaceIDState) {
+                    FaceIDState.Recognising -> {
+                        Timber.d("On Pause detected while face recognition, cancel whole flow.")
+                        cancellationSignal.cancel()
+                        source.lifecycle.removeObserver(this)
+                    }
+                    FaceIDState.NotRecognised -> {
+                        Timber.d("On Pause detected while NotRecognised state, cancel whole flow.")
+                        continueWith(FaceIDState.Cancel)
+                        source.lifecycle.removeObserver(this)
+                    }
+                    else -> {
+
+                    }
+                }
+            }
+        }
+    }
+
+    override fun toString(): String {
+        return "Huawei FaceID Handler, with default handler as fallback = ${defaultBiometricHandler != null}"
     }
 }

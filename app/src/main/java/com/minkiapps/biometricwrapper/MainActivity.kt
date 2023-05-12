@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -45,10 +46,19 @@ import com.minkiapps.biometricwrapper.biometric.BiometricHandler
 import com.minkiapps.biometricwrapper.biometric.BiometricUI
 import com.minkiapps.biometricwrapper.biometric.BiometricUIModel
 import com.minkiapps.biometricwrapper.biometric.getBiometricHandler
+import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdContinueable
+import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable
+import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable.FaceIDUIState
+import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable.TransitionState
 import com.minkiapps.biometricwrapper.ui.theme.BiometricwrapperTheme
 import com.minkiapps.biometricwrapper.util.isHMSAvailable
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import kotlin.random.Random
 
 class MainActivity : FragmentActivity() {
 
@@ -77,9 +87,9 @@ class MainActivity : FragmentActivity() {
 @Composable
 fun Screen(
     isHMSAvailable: Boolean,
-    fireBiometric : Boolean,
+    fireBiometric: Boolean,
     biometricHandler: BiometricHandler?,
-    onViewEvent : (ViewEvent) -> Unit
+    onViewEvent: (ViewEvent) -> Unit
 ) {
     val snackBarHostState = remember { SnackbarHostState() }
 
@@ -163,6 +173,10 @@ fun Screen(
                 }
             }
 
+            if(biometricHandler != null) {
+                Text(text = biometricHandler.toString())
+            }
+
             if (biometricHandler != null) {
                 val scope = rememberCoroutineScope()
                 fun showBiometric() {
@@ -194,9 +208,11 @@ fun Screen(
                     }
                 }
 
-                if(fireBiometric) {
-                    Timber.d("FIRE BIOMETRIC!")
-                    showBiometric()
+                LaunchedEffect(fireBiometric) {
+                    if (fireBiometric) {
+                        Timber.d("FIRE BIOMETRIC!")
+                        showBiometric()
+                    }
                 }
 
                 Button(onClick = {
@@ -211,10 +227,11 @@ fun Screen(
 
 @Composable
 fun TestScreen() {
-
     val animatable = rememberLottieAnimatable()
-    val recognising = rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.face_id_recognising))
-    val success = rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.face_id_success))
+    val recognising =
+        rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.face_id_recognising))
+    val success =
+        rememberLottieComposition(spec = LottieCompositionSpec.RawRes(R.raw.face_id_success))
 
     val default = AnimState(recognising, iterations = LottieConstants.IterateForever)
     val state = remember {
@@ -246,8 +263,10 @@ fun TestScreen() {
                 Text(text = "Reset")
             }
             Button(onClick = {
-                val startFrame = recognising.value?.getFrameForProgress(animatable.progress)?.toInt()
-                state.value = AnimState(success,
+                val startFrame =
+                    recognising.value?.getFrameForProgress(animatable.progress)?.toInt()
+                state.value = AnimState(
+                    success,
                     LottieClipSpec.Frame(min = startFrame),
                     1
                 )
@@ -270,17 +289,48 @@ fun TestScreen() {
 )
 @Composable
 fun DefaultPreview() {
-    BiometricwrapperTheme {
-        Screen(isHMSAvailable = true,
-            true, object : BiometricHandler {
-            override fun canBeUsed(): Boolean {
-                return true
-            }
+    val toSuccessContinueable = object : HuaweiFaceIdContinueable {
+        val tFlow = MutableStateFlow<TransitionState>(TransitionState.Default)
+        override fun getUITransitionFlow(): StateFlow<TransitionState> {
+            return tFlow
+        }
 
-            override suspend fun showBiometricPrompt(uiModel: BiometricUIModel): Boolean {
-                return true
+        override fun continueWith(state: HuaweiFaceIdContinueable.FaceIDState) {
+
+        }
+    }
+    BiometricwrapperTheme {
+        var fireBiometric by remember {
+            mutableStateOf(false)
+        }
+        Screen(isHMSAvailable = true,
+            fireBiometric, object : BiometricHandler, HuaweiFaceIdUIStateable {
+                private val flow = MutableStateFlow<FaceIDUIState>(FaceIDUIState.None)
+
+                override fun toString(): String {
+                    return "Test Huawei FaceID Handler"
+                }
+
+                override fun canBeUsed(): Boolean {
+                    return true
+                }
+
+                override suspend fun showBiometricPrompt(uiModel: BiometricUIModel): Boolean {
+                    toSuccessContinueable.tFlow.update { TransitionState.Default }
+                    flow.update { FaceIDUIState.Recognising(toSuccessContinueable) }
+                    delay(500 + Random.nextLong(2000))
+                    toSuccessContinueable.tFlow.update { TransitionState.ToSuccess }
+                    delay(1500)
+                    flow.update { FaceIDUIState.None }
+                    return true
+                }
+
+                override fun getShowUIDuringFaceIDFlow(): StateFlow<FaceIDUIState> {
+                    return flow
+                }
+            }) { e ->
+                fireBiometric = e == ViewEvent.OnLaunchBiometricButtonClicked
             }
-        }) { }
     }
 }
 

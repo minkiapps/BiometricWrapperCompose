@@ -43,6 +43,10 @@ class BiometricHandlerImpl(private val activity: FragmentActivity) :
             false
         }
     }
+
+    override fun toString(): String {
+        return "Default BiometricHandler"
+    }
 }
 
 private suspend fun Class2BiometricAuthPrompt.showBiometricPrompt(host: AuthPromptHost) : BiometricPrompt.AuthenticationResult{

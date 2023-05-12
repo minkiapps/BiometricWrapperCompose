@@ -43,7 +43,7 @@ import com.airbnb.lottie.compose.rememberLottieAnimatable
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.minkiapps.biometricwrapper.R
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdContinueable
-import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdContinueable.ContinueState
+import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdContinueable.FaceIDState
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable.FaceIDUIState
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable.TransitionState
@@ -70,9 +70,8 @@ fun HuaweiFaceIdBiometricHandler(faceIDUI: HuaweiFaceIdUIStateable) {
 
     when (faceUIState) {
         FaceIDUIState.None -> {}
-        is FaceIDUIState.AskToRetry -> {
-            val continuation = (faceUIState as FaceIDUIState.AskToRetry).faceIDContinuation
-            FaceIDRetryDialog(continuation)
+        is FaceIDUIState.NotRecognised -> {
+            FaceIDNotRecognisedDialog(faceUIState as FaceIDUIState.NotRecognised)
         }
 
         is FaceIDUIState.Recognising -> {
@@ -83,7 +82,7 @@ fun HuaweiFaceIdBiometricHandler(faceIDUI: HuaweiFaceIdUIStateable) {
 }
 
 @Composable
-fun FaceIDRetryDialog(continuable: HuaweiFaceIdContinueable) {
+fun FaceIDNotRecognisedDialog(state : FaceIDUIState.NotRecognised) {
     Dialog(
         onDismissRequest = { },
         properties = DialogProperties(
@@ -112,7 +111,12 @@ fun FaceIDRetryDialog(continuable: HuaweiFaceIdContinueable) {
                         .height(imageSize)
                 )
 
-                Text(text = "Face Not Recognised",
+                val titleText = if(state.isNonRecoverableError) {
+                    "Face Recognition Failed"
+                } else {
+                    "Face Not Recognised"
+                }
+                Text(text = titleText,
                     color = Color.White,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
@@ -124,44 +128,51 @@ fun FaceIDRetryDialog(continuable: HuaweiFaceIdContinueable) {
                     .height(0.5.dp)
                     .background(Color.LightGray)
                 )
-                Text(
-                    text = "Try Face ID Again",
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
+
+                if(!state.isNonRecoverableError) {
+                    Text(
+                        text = "Try Face ID Again",
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = rememberRipple(bounded = true)
+                            ) {
+                                state.faceIDContinuation.continueWith(FaceIDState.Recognising)
+                            }
+                            .padding(12.dp)
+                    )
+                    Spacer(modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = rememberRipple(bounded = true)
-                        ) {
-                            continuable.continueWith(ContinueState.Retry)
-                        }
-                        .padding(12.dp)
-                )
-                Spacer(modifier = Modifier
-                    .fillMaxWidth()
-                    .height(0.5.dp)
-                    .background(Color.LightGray)
-                )
-                Text(
-                    text = "Use Fingerprint",
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
+                        .height(0.5.dp)
+                        .background(Color.LightGray)
+                    )
+                }
+
+                if(state.hasFingerprint) {
+                    Text(
+                        text = "Use Fingerprint",
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = rememberRipple(bounded = true)
+                            ) {
+                                state.faceIDContinuation.continueWith(FaceIDState.UseDefaultBiometric)
+                            }
+                            .padding(12.dp)
+                    )
+                    Spacer(modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = rememberRipple(bounded = true)
-                        ) {
-                            continuable.continueWith(ContinueState.UseDefaultBiometric)
-                        }
-                        .padding(12.dp)
-                )
-                Spacer(modifier = Modifier
-                    .fillMaxWidth()
-                    .height(0.5.dp)
-                    .background(Color.LightGray)
-                )
+                        .height(0.5.dp)
+                        .background(Color.LightGray)
+                    )
+                }
+
                 Text(
                     stringResource(id = android.R.string.cancel),
                     textAlign = TextAlign.Center,
@@ -172,7 +183,7 @@ fun FaceIDRetryDialog(continuable: HuaweiFaceIdContinueable) {
                             interactionSource = remember { MutableInteractionSource() },
                             indication = rememberRipple(bounded = true)
                         ) {
-                            continuable.continueWith(ContinueState.Cancel)
+                            state.faceIDContinuation.continueWith(FaceIDState.Cancel)
                         }
                         .padding(12.dp)
                 )
@@ -185,7 +196,7 @@ fun FaceIDRetryDialog(continuable: HuaweiFaceIdContinueable) {
 fun FaceIDRecognisingDialog(continuable: HuaweiFaceIdContinueable) {
     Dialog(
         onDismissRequest = {
-            continuable.continueWith(ContinueState.Cancel)
+            continuable.continueWith(FaceIDState.Cancel)
         },
         properties = DialogProperties(
             dismissOnBackPress = false,
@@ -215,7 +226,7 @@ fun FaceIDRecognisingDialog(continuable: HuaweiFaceIdContinueable) {
                 Timber.d("NEW tState: ${tState.javaClass.simpleName}")
 
                 FaceIDAnimationWithChangingClipSpecImpl(tState) {
-                    continuable.continueWith(ContinueState.SuccessTransitionEnd)
+                    continuable.continueWith(FaceIDState.SuccessTransitionEnd)
                 }
 
                 Text(
@@ -248,7 +259,8 @@ fun FaceIDAnimationWithChangingClipSpecImpl(tState : TransitionState, animationE
     val animState = animateLottieCompositionAsState(
         composition = composition,
         clipSpec = clipSpec,
-        iterations = iteration
+        iterations = iteration,
+        speed = 1.3f
     )
 
     LottieAnimation(
@@ -284,7 +296,7 @@ fun FaceIDAnimationWithChangingClipSpecImpl(tState : TransitionState, animationE
 @Composable
 fun FaceIDAnimationWithSwapAnimationImpl(tState : TransitionState, animationEnd : () -> Unit) {
     Timber.d("Calling FaceIDAnimationWithSwapAnimationImpl")
-    val imageSize = 100.dp
+    val imageSize = 120.dp
 
     val recComp = rememberLottieComposition(
         LottieCompositionSpec.RawRes(R.raw.face_id_recognising)
@@ -306,7 +318,8 @@ fun FaceIDAnimationWithSwapAnimationImpl(tState : TransitionState, animationEnd 
         animatable.animate(
             animState.value.compositionResult.value,
             iterations = animState.value.iterations,
-            clipSpec = animState.value.clipSpec
+            clipSpec = animState.value.clipSpec,
+            speed = 1.3f
         )
     }
 
@@ -357,16 +370,16 @@ fun PreviewHuaweiFaceIDUI() {
         HuaweiFaceIdBiometricHandler(object : HuaweiFaceIdUIStateable {
             override fun getShowUIDuringFaceIDFlow(): StateFlow<FaceIDUIState> {
                 return MutableStateFlow(
-                    FaceIDUIState.AskToRetry(
+                    FaceIDUIState.NotRecognised(
                         object : HuaweiFaceIdContinueable {
                             override fun getUITransitionFlow(): StateFlow<TransitionState> {
                                 return MutableStateFlow(TransitionState.ToSuccess)
                             }
 
-                            override fun continueWith(state: ContinueState) {
+                            override fun continueWith(state: FaceIDState) {
 
                             }
-                        }
+                        }, isNonRecoverableError = false, hasFingerprint = true
                     )
                 )
             }
