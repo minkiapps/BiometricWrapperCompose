@@ -8,10 +8,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -51,6 +54,7 @@ import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable.FaceIDUIState
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable.TransitionState
 import com.minkiapps.biometricwrapper.ui.theme.BiometricwrapperTheme
+import com.minkiapps.biometricwrapper.util.formatLogTime
 import com.minkiapps.biometricwrapper.util.isHMSAvailable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,12 +74,12 @@ class MainActivity : FragmentActivity() {
         val isHMSAvailable = isHMSAvailable()
 
         setContent {
-            val fireBiometric by vm.fireBiometricFlow.collectAsStateWithLifecycle()
+            val screenState by vm.state.collectAsStateWithLifecycle()
 
             BiometricwrapperTheme {
                 Screen(
                     isHMSAvailable,
-                    fireBiometric,
+                    screenState,
                     biometricHandlerLifeCycleAware(this)
                 ) { event -> vm.onViewEvent(event) }
             }
@@ -86,7 +90,7 @@ class MainActivity : FragmentActivity() {
 @Composable
 fun Screen(
     isHMSAvailable: Boolean,
-    fireBiometric: Boolean,
+    screenState: ScreenState,
     biometricHandler: BiometricHandler?,
     onViewEvent: (ViewEvent) -> Unit
 ) {
@@ -115,6 +119,7 @@ fun Screen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(pV)
+                .padding(start = 8.dp, end = 8.dp)
         ) {
             Text(
                 text = "Biometric Wrapper",
@@ -207,17 +212,39 @@ fun Screen(
                     }
                 }
 
-                LaunchedEffect(fireBiometric) {
-                    if (fireBiometric) {
+                LaunchedEffect(screenState) {
+                    if (screenState.fireBiometric) {
                         Timber.d("FIRE BIOMETRIC!")
                         showBiometric()
                     }
                 }
 
-                Button(onClick = {
-                    onViewEvent.invoke(ViewEvent.OnLaunchBiometricButtonClicked)
-                }, modifier = Modifier.padding(top = 8.dp)) {
-                    Text(text = "Biometric Auth")
+                Row {
+                    Button(
+                        onClick = {
+                            onViewEvent.invoke(ViewEvent.OnLaunchBiometricButtonClicked)
+                        }, modifier = Modifier.padding(top = 8.dp, end = 8.dp)
+                    ) {
+                        Text(text = "Biometric Auth")
+                    }
+
+                    Button(onClick = {
+                        onViewEvent.invoke(ViewEvent.OnClearLogsClicked)
+                    }, modifier = Modifier.padding(top = 8.dp)) {
+                        Text(text = "Clear Log")
+                    }
+                }
+
+                LazyColumn(modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .padding(top = 8.dp)) {
+                    items(screenState.logs) { l ->
+                        Text(
+                            text = "${l.timeStamp.formatLogTime()}: ${l.message}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
         }
@@ -303,7 +330,10 @@ fun DefaultPreview() {
             mutableStateOf(false)
         }
         Screen(isHMSAvailable = true,
-            fireBiometric, object : BiometricHandler, HuaweiFaceIdUIStateable {
+            ScreenState(fireBiometric = false, logs = listOf(
+                BiometricLog(System.currentTimeMillis(), "Fire Biometric"),
+                BiometricLog(System.currentTimeMillis() + 200, "Biometric failed")
+            )), object : BiometricHandler, HuaweiFaceIdUIStateable {
                 private val flow = MutableStateFlow<FaceIDUIState>(FaceIDUIState.None)
 
                 override fun toString(): String {
