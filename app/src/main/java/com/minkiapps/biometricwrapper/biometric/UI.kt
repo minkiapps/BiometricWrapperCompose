@@ -223,7 +223,7 @@ fun FaceIDRecognisingDialog(continuable: HuaweiFaceIdContinueable) {
 
                 Timber.d("NEW tState: ${tState.javaClass.simpleName}")
 
-                FaceIDAnimationWithChangingClipSpecImpl(tState) {
+                FaceIDAnimationWithSwapAnimationImpl(tState) {
                     continuable.continueWith(FaceIDState.SuccessTransitionEnd)
                 }
 
@@ -351,7 +351,7 @@ fun FaceIDAnimationWithSwapAnimationImpl(tState : TransitionState, animationEnd 
                 recComp.value?.getFrameForProgress(animatable.progress)?.toInt()
             Timber.d("CURRENT FRAME: $currentFrame")
             val clipSpec = LottieClipSpec.Frame(
-                min = currentFrame
+                min = currentFrame?.plus(1)
             )
 
             animState.value = AnimState(
