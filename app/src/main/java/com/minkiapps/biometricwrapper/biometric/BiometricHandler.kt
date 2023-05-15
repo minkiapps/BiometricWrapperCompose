@@ -25,7 +25,7 @@ data class BiometricUIModel(val title : String,
 private fun getBiometricHandler(activity: FragmentActivity) : BiometricHandler? {
     val defaultHandler = BiometricHandlerImpl(activity)
 
-    if(activity.isHMSAvailable()) {
+    if(true || activity.isHMSAvailable()) {
         val handler = HuaweiFaceIDHandler(activity,
             if(defaultHandler.canBeUsed()) defaultHandler
             else null

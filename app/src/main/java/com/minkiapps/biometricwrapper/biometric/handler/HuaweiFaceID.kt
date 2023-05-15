@@ -84,7 +84,7 @@ class HuaweiFaceIDHandler(private val activity: FragmentActivity,
     override fun getShowUIDuringFaceIDFlow(): StateFlow<FaceIDUIState> = uiDuringFaceIDFlow
 
     fun canBeUsed() : Boolean {
-        return faceManager.canAuth() == FaceManager.FACE_SUCCESS
+        return true || faceManager.canAuth() == FaceManager.FACE_SUCCESS
     }
 
     @MainThread
@@ -173,7 +173,7 @@ class HuaweiFaceIDHandler(private val activity: FragmentActivity,
         override fun onAuthError(errMsgId: Int, errString: CharSequence) {
             Timber.e("Face Authentication error errorCode=$errMsgId,errorMessage=$errString")
 
-            when(errMsgId) {
+            /*when(errMsgId) {
                 FACE_ERROR_CANCELED -> {
                     continueWith(FaceIDState.Cancel)
                 }
@@ -183,7 +183,7 @@ class HuaweiFaceIDHandler(private val activity: FragmentActivity,
                 else -> {
                     continueWith(FaceIDState.Failed)
                 }
-            }
+            }*/
         }
 
         override fun onAuthHelp(helpMsgId: Int, helpString: CharSequence) {

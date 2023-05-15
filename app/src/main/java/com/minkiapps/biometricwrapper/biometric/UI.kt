@@ -13,10 +13,7 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ripple.rememberRipple
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -42,6 +39,7 @@ import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieAnimatable
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.minkiapps.biometricwrapper.R
+import com.minkiapps.biometricwrapper.ViewEvent
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdContinueable
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdContinueable.FaceIDState
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable
@@ -235,6 +233,21 @@ fun FaceIDRecognisingDialog(continuable: HuaweiFaceIdContinueable) {
                     textAlign = TextAlign.Center,
                     color = Color.White
                 )
+
+                Button(
+                    onClick = {
+                        continuable.continueWith(FaceIDState.Recognised)
+                    }, modifier = Modifier.padding(top = 8.dp, end = 8.dp)
+                ) {
+                    Text(text = "Auth Test")
+                }
+                Button(
+                    onClick = {
+                        continuable.continueWith(FaceIDState.NotRecognised)
+                    }, modifier = Modifier.padding(top = 8.dp, end = 8.dp)
+                ) {
+                    Text(text = "Fail Test")
+                }
             }
         }
     }
