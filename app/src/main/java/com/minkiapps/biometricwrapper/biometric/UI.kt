@@ -53,13 +53,11 @@ import kotlinx.coroutines.flow.StateFlow
 import timber.log.Timber
 
 @Composable
-fun BiometricUI(biometricHandler: BiometricHandler?) {
-    biometricHandler?.let { h ->
-        when (h) {
-            is HuaweiFaceIdUIStateable -> HuaweiFaceIdBiometricHandler(h)
-            else -> {
-                //system provides biometric UI
-            }
+fun BiometricUI(biometricHandler: BiometricHandler) {
+    when (biometricHandler) {
+        is HuaweiFaceIdUIStateable -> HuaweiFaceIdBiometricHandler(biometricHandler)
+        else -> {
+            //system provides biometric UI
         }
     }
 }

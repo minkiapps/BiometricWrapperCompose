@@ -3,6 +3,7 @@ package com.minkiapps.biometricwrapper
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.minkiapps.biometricwrapper.biometric.BiometricResult
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,8 +35,8 @@ class MainViewModel : ViewModel() {
     fun onViewEvent(viewEvent: ViewEvent) {
         when(viewEvent) {
             is ViewEvent.OnBiometricResult -> {
-                Timber.d("Received Biometric Result: ${viewEvent.success}")
-                logs.add(BiometricLog(message = "On biometric result received: ${viewEvent.success}"))
+                Timber.d("Received Biometric Result: ${viewEvent.biometricResult}")
+                logs.add(BiometricLog(message = "On biometric result received: ${viewEvent.biometricResult}"))
                 _fireBiometricFlow.update { false }
             }
             ViewEvent.OnLaunchBiometricButtonClicked -> {
@@ -50,6 +51,10 @@ class MainViewModel : ViewModel() {
             ViewEvent.OnClearLogsClicked -> {
                 logs.clear()
             }
+
+            ViewEvent.ResetFireBiometricState -> {
+                _fireBiometricFlow.update { false }
+            }
         }
     }
 }
@@ -59,7 +64,8 @@ data class BiometricLog(val timeStamp : Long = System.currentTimeMillis(), val m
 sealed class ViewEvent {
     object OnLaunchBiometricButtonClicked : ViewEvent()
     object OnClearLogsClicked : ViewEvent()
-    class OnBiometricResult(val success : Boolean) : ViewEvent()
+    class OnBiometricResult(val biometricResult: BiometricResult) : ViewEvent()
+    object ResetFireBiometricState : ViewEvent()
 }
 
 data class ScreenState(

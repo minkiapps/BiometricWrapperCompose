@@ -8,6 +8,7 @@ import androidx.biometric.auth.AuthPromptHost
 import androidx.biometric.auth.Class2BiometricAuthPrompt
 import androidx.fragment.app.FragmentActivity
 import com.minkiapps.biometricwrapper.biometric.BiometricHandler
+import com.minkiapps.biometricwrapper.biometric.BiometricResult
 import com.minkiapps.biometricwrapper.biometric.BiometricUIModel
 import com.minkiapps.biometricwrapper.util.resumeIfPossible
 import kotlinx.coroutines.CancellableContinuation
@@ -24,7 +25,11 @@ class BiometricHandlerImpl(private val activity: FragmentActivity) :
         return biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
     }
 
-    override suspend fun showBiometricPrompt(uiModel: BiometricUIModel): Boolean {
+    fun nonEnrolled() : Boolean {
+        return biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED
+    }
+
+    override suspend fun showBiometricPrompt(uiModel: BiometricUIModel): BiometricResult {
         val prompt = Class2BiometricAuthPrompt
             .Builder(uiModel.title, activity.getText(android.R.string.cancel))
             .setDescription(uiModel.description)
@@ -34,13 +39,18 @@ class BiometricHandlerImpl(private val activity: FragmentActivity) :
         return try {
             prompt.showBiometricPrompt(AuthPromptHost(activity))
             Timber.d("Biometric authentication succeeded!")
-            true
+            BiometricResult.Success
         } catch (e: AuthPromptErrorException) {
             // Handle irrecoverable error during authentication.
             // Possible values for AuthPromptErrorException.errorCode are listed in the @IntDef,
             // androidx.biometric.BiometricPrompt.AuthenticationError.
             Timber.e("Biometric auth error, code: ${e.errorCode} message: ${e.errorMessage}")
-            false
+            if(e.errorCode == BiometricPrompt.ERROR_CANCELED
+                || e.errorCode == BiometricPrompt.ERROR_USER_CANCELED) {
+                BiometricResult.Cancelled
+            } else {
+                BiometricResult.Failed(e.errorCode, e.errorMessage)
+            }
         }
     }
 
