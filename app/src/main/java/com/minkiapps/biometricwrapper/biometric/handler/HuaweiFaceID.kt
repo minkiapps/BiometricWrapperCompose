@@ -13,6 +13,7 @@ import com.huawei.hms.support.api.fido.bioauthn.FaceManager
 import com.minkiapps.biometricwrapper.biometric.BiometricHandler
 import com.minkiapps.biometricwrapper.biometric.BiometricResult
 import com.minkiapps.biometricwrapper.biometric.BiometricUIModel
+import com.minkiapps.biometricwrapper.biometric.HUAWEI_FACE_ID_CANCELLED
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdContinueable.FaceIDState
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable.FaceIDUIState
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIdUIStateable.TransitionState
@@ -102,9 +103,9 @@ class HuaweiFaceIDHandler(private val activity: FragmentActivity,
 
         return when(result) {
             FaceIDHandlerResult.SUCCESS -> BiometricResult.Success
-            FaceIDHandlerResult.CANCELLED -> BiometricResult.Cancelled
+            FaceIDHandlerResult.CANCELLED -> BiometricResult.Cancelled(errorCode = HUAWEI_FACE_ID_CANCELLED)
             FaceIDHandlerResult.FALLBACK_TO_DEFAULT -> {
-                defaultBiometricHandler?.showBiometricPrompt(uiModel) ?: BiometricResult.Cancelled
+                defaultBiometricHandler?.showBiometricPrompt(uiModel) ?: BiometricResult.Cancelled(errorCode = HUAWEI_FACE_ID_CANCELLED)
             }
         }
     }

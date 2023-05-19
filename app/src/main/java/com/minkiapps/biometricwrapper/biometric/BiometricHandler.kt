@@ -15,6 +15,7 @@ import com.minkiapps.biometricwrapper.biometric.handler.BiometricHandlerImpl
 import com.minkiapps.biometricwrapper.biometric.handler.HuaweiFaceIDHandler
 import com.minkiapps.biometricwrapper.util.isHMSAvailable
 
+const val HUAWEI_FACE_ID_CANCELLED = 10001
 sealed class BiometricHandlerResult {
     object Initialising : BiometricHandlerResult()
     class HasHandler(val biometricHandler: BiometricHandler) : BiometricHandlerResult()
@@ -33,15 +34,15 @@ sealed class BiometricResult {
         }
     }
 
-    object Cancelled : BiometricResult() {
+    class Cancelled(val errorCode : Int, val errorMessage : CharSequence = "") : BiometricResult() {
         override fun toString(): String {
-            return "Cancelled"
+            return "Cancelled, ErrorCode: $errorCode, ErrorMessage: $errorMessage"
         }
     }
     class Failed(val errorCode : Int,
                  val humanReadableErrorMessage : CharSequence) : BiometricResult() {
         override fun toString(): String {
-            return "Failed ErrorCode: $errorCode, ErrorMessage: $humanReadableErrorMessage"
+            return "Failed, ErrorCode: $errorCode, ErrorMessage: $humanReadableErrorMessage"
         }
     }
 }

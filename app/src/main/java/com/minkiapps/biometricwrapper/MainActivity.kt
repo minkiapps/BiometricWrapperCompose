@@ -203,7 +203,7 @@ fun Screen(
                         )
 
                         val snackBarText = when(result) {
-                            BiometricResult.Cancelled -> "Biometric identification cancelled!"
+                            is BiometricResult.Cancelled -> "Biometric identification cancelled!"
                             is BiometricResult.Failed -> "Biometric identification failed!"
                             BiometricResult.Success -> "Biometric identification successful!"
                         }

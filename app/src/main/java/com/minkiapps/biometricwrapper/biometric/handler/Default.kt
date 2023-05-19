@@ -46,8 +46,9 @@ class BiometricHandlerImpl(private val activity: FragmentActivity) :
             // androidx.biometric.BiometricPrompt.AuthenticationError.
             Timber.e("Biometric auth error, code: ${e.errorCode} message: ${e.errorMessage}")
             if(e.errorCode == BiometricPrompt.ERROR_CANCELED
-                || e.errorCode == BiometricPrompt.ERROR_USER_CANCELED) {
-                BiometricResult.Cancelled
+                || e.errorCode == BiometricPrompt.ERROR_USER_CANCELED
+                || e.errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                BiometricResult.Cancelled(e.errorCode, e.errorMessage)
             } else {
                 BiometricResult.Failed(e.errorCode, e.errorMessage)
             }
